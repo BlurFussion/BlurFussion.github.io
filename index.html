@@ -13,23 +13,32 @@
 
     .nav {
       display: flex;
-      background: #111827;
+      justify-content: space-between;
       padding: 15px;
-      gap: 20px;
-      justify-content: center;
+      background: #111827;
       border-bottom: 1px solid #222;
     }
 
-    .nav button {
+    .nav input {
+      width: 300px;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      background: #1f2937;
+      color: white;
+    }
+
+    .nav-buttons button {
+      margin-left: 10px;
       background: #1f2937;
       border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
+      padding: 10px 15px;
+      border-radius: 6px;
       color: white;
       cursor: pointer;
     }
 
-    .nav button:hover {
+    .nav-buttons button:hover {
       background: #00ffcc;
       color: black;
     }
@@ -46,10 +55,10 @@
 
     .card {
       background: #111827;
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 15px;
       text-align: center;
-      transition: 0.2s;
+      cursor: pointer;
     }
 
     .card:hover {
@@ -57,27 +66,28 @@
     }
 
     img {
-      width: 80px;
+      width: 70px;
     }
 
-    .price {
-      color: #00ffcc;
-      font-weight: bold;
+    .price { color: #00ffcc; }
+    .deal { color: #22c55e; }
+
+    .hidden { display: none; }
+
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      padding: 40px;
+      overflow-y: auto;
     }
 
-    .deal {
-      color: #22c55e;
-      font-weight: bold;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      border: none;
-      margin-bottom: 20px;
-      background: #1f2937;
-      color: white;
+    .modal-content {
+      background: #111827;
+      padding: 20px;
+      border-radius: 10px;
     }
   </style>
 </head>
@@ -85,60 +95,83 @@
 <body>
 
 <div class="nav">
-  <button onclick="tab('market')">Market</button>
-  <button onclick="tab('flips')">Deals</button>
-  <button onclick="tab('sniper')">Sniper</button>
+  <input type="text" placeholder="Search items..." onkeyup="searchItems(this.value)">
+  
+  <div class="nav-buttons">
+    <button onclick="showTab('market')">Market</button>
+    <button onclick="showTab('deals')">Deals</button>
+    <button onclick="showTab('settings')">Settings</button>
+  </div>
 </div>
 
 <div class="container">
 
-<div id="market">
-  <h2>Live Market</h2>
-  <div class="grid" id="marketGrid"></div>
+  <div id="market">
+    <div class="grid" id="marketGrid"></div>
+  </div>
+
+  <div id="deals" class="hidden">
+    <h2>Deals (20%+ under market value)</h2>
+    <div class="grid" id="dealGrid"></div>
+  </div>
+
+  <div id="settings" class="hidden">
+    <h2>Settings</h2>
+    <input id="apiInput" placeholder="Enter API Key">
+    <button onclick="saveKey()">Save Key</button>
+  </div>
+
 </div>
 
-<div id="flips" style="display:none;">
-  <h2>Best Deals</h2>
-  <div class="grid" id="dealGrid"></div>
-</div>
+<div id="modal" class="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <h2 id="itemName"></h2>
 
-<div id="sniper" style="display:none;">
-  <h2>Sniper Tool</h2>
-  <input placeholder="Enter item name..." id="snipeInput">
-  <button onclick="startSniper()">Start Sniping</button>
-  <div id="sniperResults"></div>
-</div>
+    <h3>Item Market</h3>
+    <div id="itemMarket"></div>
 
+    <h3>Bazaar</h3>
+    <div id="bazaar"></div>
+  </div>
 </div>
 
 <script>
-const API_KEY = "Tym7CAWL1JYBhRnN";
-
+let API_KEY = localStorage.getItem("tornKey") || "";
 let items = [];
-let sniperActive = false;
 
-function tab(name){
-  document.querySelectorAll(".container > div").forEach(d => d.style.display="none");
-  document.getElementById(name).style.display="block";
+function saveKey(){
+  API_KEY = document.getElementById("apiInput").value;
+  localStorage.setItem("tornKey", API_KEY);
+  alert("Saved!");
+  loadItems();
 }
 
-async function load(){
+function showTab(tab){
+  ["market","deals","settings"].forEach(id=>{
+    document.getElementById(id).classList.add("hidden");
+  });
+  document.getElementById(tab).classList.remove("hidden");
+}
+
+async function loadItems(){
+  if(!API_KEY) return;
+
   const res = await fetch(`https://api.torn.com/torn/?selections=items&key=${API_KEY}`);
   const data = await res.json();
 
-  items = Object.values(data.items);
+  items = Object.entries(data.items).map(([id, val]) => ({id, ...val}));
 
-  renderMarket();
-  findDeals();
+  renderItems(items);
+  renderDeals();
 }
 
-function renderMarket(){
+function renderItems(list){
   const grid = document.getElementById("marketGrid");
   grid.innerHTML = "";
 
-  items.slice(0,60).forEach(i=>{
+  list.forEach(i=>{
     grid.innerHTML += `
-      <div class="card">
+      <div class="card" onclick="openItem(${i.id})">
         <img src="${i.image}">
         <h3>${i.name}</h3>
         <p class="price">$${i.market_value}</p>
@@ -147,61 +180,63 @@ function renderMarket(){
   });
 }
 
-function findDeals(){
-  const deals = items.filter(i => i.market_value < i.buy_price * 0.8);
+function renderDeals(){
+  const deals = items.filter(i => i.market_value && i.buy_price && i.market_value < i.buy_price * 0.8);
 
   const grid = document.getElementById("dealGrid");
   grid.innerHTML = "";
 
-  deals.slice(0,30).forEach(i=>{
+  deals.forEach(i=>{
     grid.innerHTML += `
-      <div class="card">
+      <div class="card" onclick="openItem(${i.id})">
         <img src="${i.image}">
         <h3>${i.name}</h3>
-        <p class="deal">UNDERVALUED</p>
+        <p class="deal">DEAL</p>
         <p>$${i.market_value}</p>
       </div>
     `;
   });
 }
 
-function startSniper(){
-  const query = document.getElementById("snipeInput").value.toLowerCase();
-  sniperActive = true;
-
-  const resultsDiv = document.getElementById("sniperResults");
-
-  setInterval(()=>{
-    if(!sniperActive) return;
-
-    const found = items.filter(i =>
-      i.name.toLowerCase().includes(query) &&
-      i.market_value < i.buy_price * 0.7
-    );
-
-    if(found.length > 0){
-      resultsDiv.innerHTML = "<h3>🔥 DEAL FOUND 🔥</h3>";
-
-      found.forEach(i=>{
-        resultsDiv.innerHTML += `
-          <div class="card">
-            <img src="${i.image}">
-            <h3>${i.name}</h3>
-            <p>$${i.market_value}</p>
-          </div>
-        `;
-      });
-
-      alert("Deal found!");
-    }
-
-  }, 10000); // checks every 10 sec
+function searchItems(query){
+  query = query.toLowerCase();
+  const filtered = items.filter(i => i.name.toLowerCase().includes(query));
+  renderItems(filtered);
 }
 
-// AUTO REFRESH EVERY 30s
-setInterval(load, 30000);
+async function openItem(id){
+  document.getElementById("modal").style.display = "block";
 
-load();
+  const item = items.find(i => i.id == id);
+  document.getElementById("itemName").innerText = item.name;
+
+  const res = await fetch(`https://api.torn.com/market/${id}?selections=itemmarket,bazaar&key=${API_KEY}`);
+  const data = await res.json();
+
+  const marketDiv = document.getElementById("itemMarket");
+  const bazaarDiv = document.getElementById("bazaar");
+
+  marketDiv.innerHTML = "";
+  bazaarDiv.innerHTML = "";
+
+  if(data.itemmarket){
+    data.itemmarket.forEach(l=>{
+      marketDiv.innerHTML += `<p>$${l.cost}</p>`;
+    });
+  }
+
+  if(data.bazaar){
+    data.bazaar.forEach(l=>{
+      bazaarDiv.innerHTML += `<p>$${l.cost}</p>`;
+    });
+  }
+}
+
+function closeModal(){
+  document.getElementById("modal").style.display = "none";
+}
+
+loadItems();
 </script>
 
 </body>
