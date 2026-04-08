@@ -1,20 +1,160 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>My First Site</title>
+  <title>Torn Market Hub</title>
   <style>
     body {
-      background: #111;
-      color: white;
+      margin: 0;
       font-family: Arial;
-      text-align: center;
-      padding-top: 50px;
+      background: #0d0d0d;
+      color: white;
     }
-    h1 { color: #00ffcc; }
+
+    .nav {
+      display: flex;
+      background: #111;
+      padding: 15px;
+      justify-content: space-around;
+    }
+
+    .nav button {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .nav button:hover {
+      color: #00ffcc;
+    }
+
+    .container {
+      padding: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .card img {
+      width: 80px;
+      height: 80px;
+    }
+
+    .price {
+      color: #00ffcc;
+      font-weight: bold;
+    }
+
+    input {
+      padding: 10px;
+      width: 100%;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      border: none;
+    }
   </style>
 </head>
+
 <body>
-  <h1>🔥 My Website 🔥</h1>
-  <p>This is my first GitHub Pages site.</p>
+
+<div class="nav">
+  <button onclick="showTab('market')">Market</button>
+  <button onclick="showTab('flips')">Flips</button>
+  <button onclick="showTab('search')">Search</button>
+</div>
+
+<div class="container">
+
+  <div id="market">
+    <h2>Market Items</h2>
+    <div class="grid" id="marketGrid"></div>
+  </div>
+
+  <div id="flips" style="display:none;">
+    <h2>Flip Opportunities</h2>
+    <div class="grid" id="flipGrid"></div>
+  </div>
+
+  <div id="search" style="display:none;">
+    <h2>Search Items</h2>
+    <input type="text" id="searchInput" placeholder="Search item..." onkeyup="searchItems()">
+    <div class="grid" id="searchGrid"></div>
+  </div>
+
+</div>
+
+<script>
+const API_KEY = "PUT_YOUR_API_KEY_HERE";
+
+let allItems = [];
+
+function showTab(tab) {
+  document.getElementById("market").style.display = "none";
+  document.getElementById("flips").style.display = "none";
+  document.getElementById("search").style.display = "none";
+
+  document.getElementById(tab).style.display = "block";
+}
+
+async function loadItems() {
+  const res = await fetch(`https://api.torn.com/torn/?selections=items&key=${API_KEY}`);
+  const data = await res.json();
+
+  allItems = Object.values(data.items);
+
+  displayItems(allItems.slice(0, 50), "marketGrid");
+  findFlips();
+}
+
+function displayItems(items, gridId) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = "";
+
+  items.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    card.innerHTML = `
+      <img src="${item.image}">
+      <h3>${item.name}</h3>
+      <p class="price">$${item.market_value}</p>
+    `;
+
+    grid.appendChild(card);
+  });
+}
+
+function findFlips() {
+  let flips = allItems.filter(item =>
+    item.market_value < item.buy_price
+  );
+
+  displayItems(flips.slice(0, 20), "flipGrid");
+}
+
+function searchItems() {
+  const query = document.getElementById("searchInput").value.toLowerCase();
+
+  const results = allItems.filter(item =>
+    item.name.toLowerCase().includes(query)
+  );
+
+  displayItems(results, "searchGrid");
+}
+
+loadItems();
+</script>
+
 </body>
 </html>
