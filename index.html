@@ -2,31 +2,36 @@
 <html>
 <head>
   <title>Torn Market Hub</title>
+
   <style>
     body {
       margin: 0;
-      font-family: Arial;
-      background: #0d0d0d;
-      color: white;
+      font-family: 'Segoe UI', Arial;
+      background: #0b0f14;
+      color: #e6edf3;
     }
 
     .nav {
       display: flex;
-      background: #111;
+      background: #111827;
       padding: 15px;
-      justify-content: space-around;
+      gap: 20px;
+      justify-content: center;
+      border-bottom: 1px solid #222;
     }
 
     .nav button {
-      background: none;
+      background: #1f2937;
       border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
       color: white;
-      font-size: 16px;
       cursor: pointer;
     }
 
     .nav button:hover {
-      color: #00ffcc;
+      background: #00ffcc;
+      color: black;
     }
 
     .container {
@@ -35,20 +40,24 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 20px;
     }
 
     .card {
-      background: #1a1a1a;
+      background: #111827;
+      border-radius: 12px;
       padding: 15px;
-      border-radius: 10px;
       text-align: center;
+      transition: 0.2s;
     }
 
-    .card img {
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    img {
       width: 80px;
-      height: 80px;
     }
 
     .price {
@@ -56,12 +65,19 @@
       font-weight: bold;
     }
 
+    .deal {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
     input {
-      padding: 10px;
       width: 100%;
-      margin-bottom: 20px;
-      border-radius: 5px;
+      padding: 12px;
+      border-radius: 8px;
       border: none;
+      margin-bottom: 20px;
+      background: #1f2937;
+      color: white;
     }
   </style>
 </head>
@@ -69,91 +85,123 @@
 <body>
 
 <div class="nav">
-  <button onclick="showTab('market')">Market</button>
-  <button onclick="showTab('flips')">Flips</button>
-  <button onclick="showTab('search')">Search</button>
+  <button onclick="tab('market')">Market</button>
+  <button onclick="tab('flips')">Deals</button>
+  <button onclick="tab('sniper')">Sniper</button>
 </div>
 
 <div class="container">
 
-  <div id="market">
-    <h2>Market Items</h2>
-    <div class="grid" id="marketGrid"></div>
-  </div>
+<div id="market">
+  <h2>Live Market</h2>
+  <div class="grid" id="marketGrid"></div>
+</div>
 
-  <div id="flips" style="display:none;">
-    <h2>Flip Opportunities</h2>
-    <div class="grid" id="flipGrid"></div>
-  </div>
+<div id="flips" style="display:none;">
+  <h2>Best Deals</h2>
+  <div class="grid" id="dealGrid"></div>
+</div>
 
-  <div id="search" style="display:none;">
-    <h2>Search Items</h2>
-    <input type="text" id="searchInput" placeholder="Search item..." onkeyup="searchItems()">
-    <div class="grid" id="searchGrid"></div>
-  </div>
+<div id="sniper" style="display:none;">
+  <h2>Sniper Tool</h2>
+  <input placeholder="Enter item name..." id="snipeInput">
+  <button onclick="startSniper()">Start Sniping</button>
+  <div id="sniperResults"></div>
+</div>
 
 </div>
 
 <script>
 const API_KEY = "PUT_YOUR_API_KEY_HERE";
 
-let allItems = [];
+let items = [];
+let sniperActive = false;
 
-function showTab(tab) {
-  document.getElementById("market").style.display = "none";
-  document.getElementById("flips").style.display = "none";
-  document.getElementById("search").style.display = "none";
-
-  document.getElementById(tab).style.display = "block";
+function tab(name){
+  document.querySelectorAll(".container > div").forEach(d => d.style.display="none");
+  document.getElementById(name).style.display="block";
 }
 
-async function loadItems() {
+async function load(){
   const res = await fetch(`https://api.torn.com/torn/?selections=items&key=${API_KEY}`);
   const data = await res.json();
 
-  allItems = Object.values(data.items);
+  items = Object.values(data.items);
 
-  displayItems(allItems.slice(0, 50), "marketGrid");
-  findFlips();
+  renderMarket();
+  findDeals();
 }
 
-function displayItems(items, gridId) {
-  const grid = document.getElementById(gridId);
+function renderMarket(){
+  const grid = document.getElementById("marketGrid");
   grid.innerHTML = "";
 
-  items.forEach(item => {
-    const card = document.createElement("div");
-    card.className = "card";
-
-    card.innerHTML = `
-      <img src="${item.image}">
-      <h3>${item.name}</h3>
-      <p class="price">$${item.market_value}</p>
+  items.slice(0,60).forEach(i=>{
+    grid.innerHTML += `
+      <div class="card">
+        <img src="${i.image}">
+        <h3>${i.name}</h3>
+        <p class="price">$${i.market_value}</p>
+      </div>
     `;
-
-    grid.appendChild(card);
   });
 }
 
-function findFlips() {
-  let flips = allItems.filter(item =>
-    item.market_value < item.buy_price
-  );
+function findDeals(){
+  const deals = items.filter(i => i.market_value < i.buy_price * 0.8);
 
-  displayItems(flips.slice(0, 20), "flipGrid");
+  const grid = document.getElementById("dealGrid");
+  grid.innerHTML = "";
+
+  deals.slice(0,30).forEach(i=>{
+    grid.innerHTML += `
+      <div class="card">
+        <img src="${i.image}">
+        <h3>${i.name}</h3>
+        <p class="deal">UNDERVALUED</p>
+        <p>$${i.market_value}</p>
+      </div>
+    `;
+  });
 }
 
-function searchItems() {
-  const query = document.getElementById("searchInput").value.toLowerCase();
+function startSniper(){
+  const query = document.getElementById("snipeInput").value.toLowerCase();
+  sniperActive = true;
 
-  const results = allItems.filter(item =>
-    item.name.toLowerCase().includes(query)
-  );
+  const resultsDiv = document.getElementById("sniperResults");
 
-  displayItems(results, "searchGrid");
+  setInterval(()=>{
+    if(!sniperActive) return;
+
+    const found = items.filter(i =>
+      i.name.toLowerCase().includes(query) &&
+      i.market_value < i.buy_price * 0.7
+    );
+
+    if(found.length > 0){
+      resultsDiv.innerHTML = "<h3>🔥 DEAL FOUND 🔥</h3>";
+
+      found.forEach(i=>{
+        resultsDiv.innerHTML += `
+          <div class="card">
+            <img src="${i.image}">
+            <h3>${i.name}</h3>
+            <p>$${i.market_value}</p>
+          </div>
+        `;
+      });
+
+      alert("Deal found!");
+    }
+
+  }, 10000); // checks every 10 sec
 }
 
-loadItems();
+// AUTO REFRESH EVERY 30s
+setInterval(load, 30000);
+
+load();
 </script>
 
 </body>
